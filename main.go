@@ -24,6 +24,7 @@ var Session, _ = discordgo.New()
 
 // Read in all configuration options from both environment variables and
 // command line arguments.
+
 func init() {
 
 	// Discord Authentication Token
