@@ -89,7 +89,21 @@ func commandHandler(discord *discordgo.Session, message *discordgo.MessageCreate
     return
   }
 
-  // content := message.Content
+  content := message.Content
+
+  switch content {
+    case "!hello":
+      discord.ChannelMessageSend(message.ChannelID, "Hello!")
+    case "!gbfc":
+      discord.ChannelMessageSend(
+        message.ChannelID,
+        "Genji Butt Fan Club aka a bunch of try hard casuals")
+    default: { // Only reply if the message was a command
+      if (string(content[0]) == "!") {
+        discord.ChannelMessageSend(message.ChannelID, "Command not found. List of commands comming soon.")
+      }
+    }
+  }
 
   fmt.Printf("Message: %+v || From: %s\n", message.Message, message.Author)
 }
