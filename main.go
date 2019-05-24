@@ -1,82 +1,95 @@
-// Declare this file to be part of the main package so it can be compiled into
-// an executable.
 package main
 
-// Import all Go packages required for this file.
 import (
-	"flag"
-	"fmt"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
+  "flag"
+  "fmt"
+  "log"
+  "os"
+  "os/signal"
+  "syscall"
 
-	"github.com/bwmarrin/discordgo"
+  "github.com/bwmarrin/discordgo"
 )
-
-// Version is a constant that stores the Disgord version information.
-const Version = "v0.0.0-alpha"
 
 // Session is declared in the global space so it can be easily used
 // throughout this program.
 // In this use case, there is no error that would be returned.
 var Session, _ = discordgo.New()
 
-// Read in all configuration options from both environment variables and
-// command line arguments.
+var (
+    commandPrefix string
+    botID         string
+)
 
+// Read in all options from environment variables and command line arguments.
 func init() {
 
-	// Discord Authentication Token
-	Session.Token = os.Getenv("DG_TOKEN")
-	if Session.Token == "" {
-		flag.StringVar(&Session.Token, "t", "", "Discord Authentication Token")
-	}
+  // Discord Authentication Token
+  Session.Token = os.Getenv("DISCORD_TOKEN")
+  if Session.Token == "" {
+    // Pointer, flag, default, description
+    flag.StringVar(&Session.Token, "t", "", "Discord Authentication Token")
+  }
 }
 
 func main() {
 
-	// Declare any variables needed later.
-	var err error
+  // Declare any variables needed later.
+  var err error
 
-	// Print out a fancy logo!
-	fmt.Printf(`
-  ________  .__                              .___
-  \______ \ |__| ______ ____  ___________  __| _/
-  ||    |  \|  |/  ___//   _|/  _ \_  __ \/ __ |
-  ||    |   \  |\___ \ |  (_ ( <_> )  | \/ /_/ |
-  ||______  /__/______|\____|\____/|__|  \____ |
-  \_______\/          %-16s`+"\n\n", Version)
+  // Setup interrupt
+  interrupt := make(chan os.Signal)
+  signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 
-	// Parse command line arguments
-	flag.Parse()
+  // Parse command line arguments
+  flag.Parse()
 
-	// Verify a Token was provided
-	if Session.Token == "" {
-		log.Println("You must provide a Discord authentication token.")
-		return
-	}
+  // Verify a Token was provided
+  if Session.Token == "" {
+    log.Println("You must provide a Discord authentication token.")
+    return
+  }
 
-	// Verify the Token is valid and grab user information
-	Session.State.User, err = Session.User("@me")
-	if err != nil {
-		log.Printf("error fetching user information, %s\n", err)
-	}
+  // Verify the Token is valid and grab user information
+  Session.State.User, err = Session.User("@me")
+  errCheck("error retrieving account", err)
 
-	// Open a websocket connection to Discord
-	err = Session.Open()
-	if err != nil {
-		log.Printf("error opening connection to Discord, %s\n", err)
-	}
+  botID = Session.State.User.ID
+  Session.AddHandler(commandHandler)
+  Session.AddHandler(func(discord *discordgo.Session, ready *discordgo.Ready) {
+    err = discord.UpdateStatus(0, "A friendly Overwatch bot!")
+    if err != nil {
+      fmt.Println("Error attempting to set my status")
+    }
+    servers := discord.State.Guilds
+    fmt.Printf("Genji-Butt-Stats-Bot has started on %d servers", len(servers))
+  })
 
-	// Wait for a CTRL-C
-	log.Printf(`Now running. Press CTRL-C to exit.`)
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-	<-sc
+  // Open a websocket connection to Discord
+  err = Session.Open()
+  defer Session.Close()
+  errCheck("Error opening connection to Discord", err)
 
-	// Clean up
-	Session.Close()
+  commandPrefix = "!"
 
-	// Exit Normally.
+  <-interrupt
+}
+
+func errCheck(msg string, err error) {
+  if err != nil {
+    fmt.Printf("%s: %+v", msg, err)
+    panic(err)
+  }
+}
+
+func commandHandler(discord *discordgo.Session, message *discordgo.MessageCreate) {
+  user := message.Author
+  if user.ID == botID || user.Bot {
+    //Do nothing because the bot is talking
+    return
+  }
+
+  // content := message.Content
+
+  fmt.Printf("Message: %+v || From: %s\n", message.Message, message.Author)
 }
